@@ -1,92 +1,79 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Firebase 掲示板</title>
-    <style>
-        body { font-family: sans-serif; background: #f5f5f5; padding: 20px; }
-        .board { max-width: 700px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; }
-        .post { border-bottom: 1px solid #ccc; padding: 10px 0; }
-        .post:last-child { border-bottom: none; }
-        input, textarea { width: 100%; padding: 8px; margin-top: 5px; }
-        button { padding: 8px 15px; margin-top: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>メール認証付き掲示板ログイン</title>
 </head>
 <body>
-<div class="board">
-    <h2>掲示板</h2>
+  <h2>ログイン / 新規登録</h2>
 
-    <form id="postForm">
-        <label>名前</label>
-        <input type="text" id="name" required />
+  <input id="email" type="email" placeholder="メールアドレス"><br>
+  <input id="password" type="password" placeholder="パスワード"><br><br>
 
-        <label>コメント</label>
-        <textarea id="message" rows="3" required></textarea>
+  <button id="loginBtn">ログイン</button>
+  <button id="signupBtn">新規登録</button>
 
-        <button type="submit">投稿する</button>
-    </form>
+  <p id="msg"></p>
 
-    <h3>投稿一覧</h3>
-    <div id="posts"></div>
-</div>
-
-<!-- Firebase CDN 読み込み -->
-<script type="module">
+  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
     import { 
-        getFirestore, collection, addDoc,
-        query, orderBy, onSnapshot 
-    } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
+        getAuth, 
+        signInWithEmailAndPassword, 
+        createUserWithEmailAndPassword, 
+        sendEmailVerification 
+    } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js";
 
-    // ⭐ あなたの Firebase 設定
     const firebaseConfig = {
-        apiKey: "AIzaSyDKQCGZj2bc7CQXTis773gs9juBwnVor0E",
-        authDomain: "ich2414-a429b.firebaseapp.com",
-        projectId: "ich2414-a429b",
-        storageBucket: "ich2414-a429b.firebasestorage.app",
-        messagingSenderId: "753800389456",
-        appId: "1:753800389456:web:174ed1eb68df6dff8b4255"
+      apiKey: "AIzaSyDKQCGZj2bc7CQXTis773gs9juBwnVor0E",
+      authDomain: "ich2414-a429b.firebaseapp.com",
+      projectId: "ich2414-a429b",
+      storageBucket: "ich2414-a429b.firebasestorage.app",
+      messagingSenderId: "753800389456",
+      appId: "1:753800389456:web:174ed1eb68df6dff8b4255"
     };
 
-    // Firebase 初期化
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-    // ⭐ 投稿処理
-    const form = document.getElementById("postForm");
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
+    const msg = document.getElementById("msg");
 
-        const name = document.getElementById("name").value;
-        const message = document.getElementById("message").value;
+    // 新規登録
+    document.getElementById("signupBtn").onclick = async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
 
-        await addDoc(collection(db, "posts"), {
-            name: name,
-            message: message,
-            createdAt: new Date()
-        });
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-        form.reset();
-    });
+        // メール認証を送信（通知だけ）
+        await sendEmailVerification(userCredential.user);
 
-    // ⭐ 投稿一覧をリアルタイムに表示
-    const postsDiv = document.getElementById("posts");
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+        msg.textContent = "登録成功！メール認証を送信しました。掲示板に移動します…";
 
-    onSnapshot(q, (snapshot) => {
-        postsDiv.innerHTML = "";
-        snapshot.forEach((doc) => {
-            const post = doc.data();
-            postsDiv.innerHTML += `
-                <div class="post">
-                    <strong>${post.name}</strong><br>
-                    <span>${post.createdAt?.toDate().toLocaleString()}</span>
-                    <p>${post.message}</p>
-                </div>
-            `;
-        });
-    });
-</script>
+        // 🔥 新規登録後そのまま掲示板へ移動
+        setTimeout(() => {
+          location.href = "index.html";
+        }, 1000);
+
+      } catch (e) {
+        msg.textContent = "登録失敗：" + e.message;
+      }
+    };
+
+    // ログイン
+    document.getElementById("loginBtn").onclick = async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        msg.textContent = "ログイン成功！掲示板へ移動します…";
+        location.href = "index.html";
+      } catch (e) {
+        msg.textContent = "ログイン失敗：" + e.message;
+      }
+    };
+  </script>
 </body>
 </html>
