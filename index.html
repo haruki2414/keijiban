@@ -2,78 +2,111 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>メール認証付き掲示板ログイン</title>
+  <title>掲示板</title>
 </head>
 <body>
-  <h2>ログイン / 新規登録</h2>
 
-  <input id="email" type="email" placeholder="メールアドレス"><br>
-  <input id="password" type="password" placeholder="パスワード"><br><br>
+<h2>掲示板</h2>
 
-  <button id="loginBtn">ログイン</button>
-  <button id="signupBtn">新規登録</button>
+<button id="logoutBtn">ログアウト</button>
+<p id="userInfo"></p>
 
-  <p id="msg"></p>
+<h3>新規投稿</h3>
+<textarea id="text" rows="4" cols="40" placeholder="投稿内容を入力"></textarea>
+<br>
+<button id="postBtn">投稿</button>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
-    import { 
-        getAuth, 
-        signInWithEmailAndPassword, 
-        createUserWithEmailAndPassword, 
-        sendEmailVerification 
-    } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js";
+<h3>投稿一覧</h3>
+<ul id="posts"></ul>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDKQCGZj2bc7CQXTis773gs9juBwnVor0E",
-      authDomain: "ich2414-a429b.firebaseapp.com",
-      projectId: "ich2414-a429b",
-      storageBucket: "ich2414-a429b.firebasestorage.app",
-      messagingSenderId: "753800389456",
-      appId: "1:753800389456:web:174ed1eb68df6dff8b4255"
-    };
+<!-- Firebase -->
+<script type="module">
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
+  import { 
+    getAuth, onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js";
+  import {
+    getFirestore, collection, addDoc, serverTimestamp,
+    query, orderBy, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
 
-    const msg = document.getElementById("msg");
+  // ★ あなたの Firebase 設定を書く
+  const firebaseConfig = {
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: ""
+  };
 
-    // 新規登録
-    document.getElementById("signupBtn").onclick = async () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const postsList = document.getElementById("posts");
+  const userInfo = document.getElementById("userInfo");
 
-        // メール認証を送信（通知だけ）
-        await sendEmailVerification(userCredential.user);
+  // --------------------
+  // ログインチェック
+  // --------------------
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      // ★ 未ログインなら login.html に戻す
+      location.href = "./login.html";
+      return;
+    }
 
-        msg.textContent = "登録成功！メール認証を送信しました。掲示板に移動します…";
+    userInfo.textContent = `ログイン中：${user.email}`;
+    loadPosts();
+  });
 
-        // 🔥 新規登録後そのまま掲示板へ移動
-        setTimeout(() => {
-          location.href = "index.html";
-        }, 1000);
+  // --------------------
+  // 投稿処理
+  // --------------------
+  document.getElementById("postBtn").onclick = async () => {
+    const text = document.getElementById("text").value.trim();
+    if (!text) return;
 
-      } catch (e) {
-        msg.textContent = "登録失敗：" + e.message;
-      }
-    };
+    const user = auth.currentUser;
 
-    // ログイン
-    document.getElementById("loginBtn").onclick = async () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+    await addDoc(collection(db, "boards"), {
+      text: text,
+      uid: user.uid,
+      email: user.email,
+      createdAt: serverTimestamp()
+    });
 
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        msg.textContent = "ログイン成功！掲示板へ移動します…";
-        location.href = "index.html";
-      } catch (e) {
-        msg.textContent = "ログイン失敗：" + e.message;
-      }
-    };
-  </script>
+    document.getElementById("text").value = "";
+  };
+
+  // --------------------
+  // 投稿一覧（リアルタイム）
+  // --------------------
+  function loadPosts() {
+    const q = query(
+      collection(db, "boards"),
+      orderBy("createdAt", "desc")
+    );
+
+    onSnapshot(q, (snapshot) => {
+      postsList.innerHTML = "";
+      snapshot.forEach((doc) => {
+        const li = document.createElement("li");
+        li.textContent = doc.data().text + " (" + doc.data().email + ")";
+        postsList.appendChild(li);
+      });
+    });
+  }
+
+  // --------------------
+  // ログアウト
+  // --------------------
+  document.getElementById("logoutBtn").onclick = () => {
+    signOut(auth);
+  };
+
+</script>
 </body>
 </html>
